@@ -327,6 +327,8 @@ export class BudgetBuilderComponent {
       for(let category of cats) {
         if (category.id == parentId) {
           let addNewCategory = category.subCategories.pop();
+          let addNewSubCategory = this.createCategory(`Add new ${newCategory.name} category`, category.type, false, true);
+          newCategory.subCategories.push(addNewSubCategory);
           category.subCategories.push(newCategory);
           if (addNewCategory) {
             addNewCategory.newName = addNewCategory.name;

@@ -23,8 +23,17 @@
           </tr>
   
           <ng-container *ngFor="let subCategory of category.subCategories">
-            <tr *ngIf="subCategory.isParent">
+            <tr *ngIf="!subCategory.isNew">
               <td class="border p-2 font-bold" [attr.colspan]="months().length + 1">{{ subCategory.name }}</td>
+            </tr>
+            <tr *ngIf="subCategory.isNew">
+              <td class="border p-2 font-bold" [attr.colspan]="months().length + 1">
+                <input type="text" 
+                  [(ngModel)]="subCategory.newName"
+                  (keydown)="handleCellKey($event, subCategory, category.id, 1, 1)"
+                 class="p-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                 style="width: 90%;"/>
+              </td>
             </tr>
 
             <ng-container *ngFor="let subSubCategory of subCategory.subCategories; let rowIndex = index">
@@ -53,7 +62,7 @@
                     [(ngModel)]="subSubCategory.newName"
                     (keydown)="handleCellKey($event, subSubCategory, subCategory.id, rowIndex + 1, 1)"
                    class="p-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                   style="width: 80%;"/>
+                   style="width: 90%;"/>
                 </td>
               </tr>
             </ng-container>
@@ -65,6 +74,7 @@
                 *ngIf="i < months().length" class="border p-2 text-right">{{ subTotal }}</td>
               </ng-container>
             </tr>
+
             <!-- Beak line -->
             <tr>
               <td class="border p-2 font-bold" [attr.colspan]="months().length + 1"></td>
