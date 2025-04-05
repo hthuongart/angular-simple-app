@@ -40,7 +40,6 @@ export class BudgetBuilderComponent {
   startDate = signal<Date>(new Date(2024, 0));
   endDate = signal<Date>(new Date(2024, 11));
   months = computed(() => this.generateMonths(this.startDate(), this.endDate()));
-  focusedCell = signal<{categoryId: string; monthIndex: number} | null>(null);
   contextMenu = signal<{x: number; y: number; category?: BudgetCategory; monthIndex?: number} | null>(null);
   categories = signal<BudgetCategory[] | []>([]);
   
@@ -125,12 +124,16 @@ export class BudgetBuilderComponent {
       let maxtrix: FocusedCellCoordinates[][] = [];
       let row: FocusedCellCoordinates[] = [];
       let focusedIndex = -1;
+      let monthsLengh =  this.months().length + 1;
       
       for(let category of categories) {
         for(let subCategory of category.subCategories) {
           row = [];
-          for(let subCategoryCell of subCategory.cells) {
-            if (subCategoryCell.allowFocus) {
+          let length = subCategory.cells.length;
+          length = length > monthsLengh ? monthsLengh : length;
+          
+          for(let i = 0; i < length; i++) {
+            if (subCategory.cells[i].allowFocus) {
               focusedIndex++;
               let focusedCellCoordinates: FocusedCellCoordinates = {
                 focusedIndex,
@@ -147,8 +150,11 @@ export class BudgetBuilderComponent {
 
           for(let subSubCategory of subCategory.subCategories) {
             row = [];
-            for(let subSubCategoryCell of subSubCategory.cells) {
-              if (subSubCategoryCell.allowFocus) {
+            let length = subSubCategory.cells.length;
+            length = length > monthsLengh ? monthsLengh : length;
+
+            for(let i = 0; i < length; i++) {
+              if (subSubCategory.cells[i].allowFocus) {
                 focusedIndex++;
                 let focusedCellCoordinates: FocusedCellCoordinates = {
                   focusedIndex,
@@ -302,10 +308,12 @@ export class BudgetBuilderComponent {
     } 
   }
 
-  onDateChange(start: HTMLInputElement, end: HTMLInputElement) {
+  async onDateChange(start: HTMLInputElement, end: HTMLInputElement) {
     this.startDate.set(new Date(start.value));
     this.endDate.set(new Date(end.value));
-    this.focusedCell.set(null);
+    this.currentRow = 0;
+    this.currentCol = 0;
+    this.focusCurrentCell();
   }
 
   // Update currentRow and currentCol when an input is focused
@@ -444,11 +452,6 @@ export class BudgetBuilderComponent {
         }
       }
       return cats;
-    });
-
-    this.focusedCell.set({ 
-      categoryId: addedCategory.id, 
-      monthIndex: 0 
     });
   }
 
