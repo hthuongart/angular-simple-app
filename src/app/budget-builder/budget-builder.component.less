@@ -9,10 +9,53 @@ input[type=number] {
 }
 
 input {
-  border: 2px solid transparent;
+  border: 1px solid rgba(38, 38, 38, .7);
+  border-radius: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  transition: all 0.3s ease;
 }
 
 input:focus {
-  border-color: #2196F3;
+  box-shadow: 0 0 15px #673ab8;
   outline: none;
+  &.income {
+    box-shadow: 0 0 15px #00da81;
+  }
+
+  &.expense {
+    box-shadow: 0 0 15px #c10f2e;
+  }
+}
+
+/* Indent sub rows */
+.sub-row td:first-child {
+  padding-left: 30px; /* Adjust indentation */
+  position: relative;
+}
+
+/* Horizontal connector line from parent to sub */
+.sub-row td:first-child::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%; /* Center vertically */
+  width: 15px; /* Length of horizontal dash */
+  border-top: 2px dashed #666;
+}
+
+/* Indent sub sub rows */
+.sub-sub-row td:first-child {
+  padding-left: 60px; /* Adjust indentation */
+  position: relative;
+}
+
+/* Horizontal connector line from parent to sub sub */
+.sub-sub-row td:first-child::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%; /* Center vertically */
+  width: 45px; /* Length of horizontal dash */
+  border-top: 2px dashed #666;
 }
