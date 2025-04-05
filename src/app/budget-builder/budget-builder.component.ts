@@ -3,16 +3,23 @@ import { Component, signal, computed, effect, ViewChildren, QueryList, ElementRe
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { withInterceptors } from '@angular/common/http';
+import { RouterLinkWithHref } from '@angular/router';
 
 interface BudgetCell {
-  value: number;
+  value: number | string;
   isEditable: boolean;
+  allowFocus: boolean;
+}
+
+interface FocusedCellCoordinates {
+  focusedIndex: number
+  row: number;
+  col: number;
 }
 
 interface BudgetCategory {
   id: string;
   name: string;
-  newName: string;
   type: 'income' | 'expense';
   isParent: boolean;
   isNew: boolean;
@@ -29,14 +36,16 @@ interface BudgetCategory {
   styleUrls: ['./budget-builder.component.less']
 })
 export class BudgetBuilderComponent {
+  @ViewChildren('cellInput') cellInputs!: QueryList<ElementRef>;
   startDate = signal<Date>(new Date(2024, 0));
   endDate = signal<Date>(new Date(2024, 11));
   months = computed(() => this.generateMonths(this.startDate(), this.endDate()));
   focusedCell = signal<{categoryId: string; monthIndex: number} | null>(null);
   contextMenu = signal<{x: number; y: number; category?: BudgetCategory; monthIndex?: number} | null>(null);
   categories = signal<BudgetCategory[] | []>([]);
-  @ViewChildren('inputRef') inputs!: QueryList<ElementRef>;
-  inputMap = new Map<string, ElementRef>(); // Maps "row,cell" to ElementRef
+  
+  currentRow = 0;
+  currentCol = 0;
   
   constructor (){
     // #region Income
@@ -83,46 +92,15 @@ export class BudgetBuilderComponent {
   }
 
   ngAfterViewInit() {
-    const firstInput = this.inputs.first;
-    if (firstInput) {
-      firstInput.nativeElement.focus();
-    }
-
-    this.buildInputMap();
-    this.inputs.changes.subscribe(() => this.buildInputMap());
-  }
-
-
-  private generateMonths(start: Date, end: Date): Date[] {
-    const months = [];
-    const current = new Date(start);
-    while (current <= end) {
-      months.push(new Date(current));
-      current.setMonth(current.getMonth() + 1);
-    }
-    return months;
-  }
-
-  private createCategory(name: string, type: 'income' | 'expense', isParent: boolean, isNew: boolean = false): BudgetCategory {
-    return {
-      id: Math.random().toString(),
-      name,
-      newName: name,
-      type,
-      isParent,
-      isNew,
-      cells: Array.from({ length: this.months().length }, () => ({ value: 0, isEditable: true })),
-      subCategories: [],
-      subTotals: Array(this.months().length).fill(0),
-    };
+    this.focusCurrentCell();
   }
 
   get totals() {
     return computed(() => {
       const totals = {
-        profitLoss: Array(this.months().length).fill(0),
-        openingBalance: Array(this.months().length).fill(0),
-        closingBalance: Array(this.months().length).fill(0)
+        profitLoss: Array(this.months().length + 1).fill(0),
+        openingBalance: Array(this.months().length + 1).fill(0),
+        closingBalance: Array(this.months().length + 1).fill(0)
       };
 
       totals.profitLoss = this.categories()[0].subTotals.map((incomeTotal, i) => incomeTotal -  this.categories()[1].subTotals[i]);
@@ -138,6 +116,57 @@ export class BudgetBuilderComponent {
       }, [0]);
 
       return totals;
+    });
+  }
+
+  get navigationMaxtrix() {
+    return computed(() => {
+      let categories = this.categories();
+      let maxtrix: FocusedCellCoordinates[][] = [];
+      let row: FocusedCellCoordinates[] = [];
+      let focusedIndex = -1;
+      
+      for(let category of categories) {
+        for(let subCategory of category.subCategories) {
+          row = [];
+          for(let subCategoryCell of subCategory.cells) {
+            if (subCategoryCell.allowFocus) {
+              focusedIndex++;
+              let focusedCellCoordinates: FocusedCellCoordinates = {
+                focusedIndex,
+                row: maxtrix.length,
+                col: row.length
+              }
+              row.push(focusedCellCoordinates);
+            }
+          }
+
+          if (row.length) {
+            maxtrix.push(row);
+          }
+
+          for(let subSubCategory of subCategory.subCategories) {
+            row = [];
+            for(let subSubCategoryCell of subSubCategory.cells) {
+              if (subSubCategoryCell.allowFocus) {
+                focusedIndex++;
+                let focusedCellCoordinates: FocusedCellCoordinates = {
+                  focusedIndex,
+                  row: maxtrix.length,
+                  col: row.length
+                }
+                row.push(focusedCellCoordinates);
+              }
+            }
+            
+            if(row.length) {
+              maxtrix.push(row);
+            }
+          }
+        }
+      }
+
+      return maxtrix;
     });
   }
 
@@ -162,7 +191,7 @@ export class BudgetBuilderComponent {
           for(let subSubCategory of subCategory.subCategories!) {
             if (subSubCategory.id == categoryInput?.id) {
               subCategory.subTotals[monthIndex] = subCategory.subCategories .filter(c => !c.isNew).reduce((accumulator, currentItem) => {
-                return accumulator + currentItem.cells[monthIndex].value;
+                return accumulator + Number(currentItem.cells[monthIndex].value);
               }, 0);
   
               category.subTotals[monthIndex] = category.subCategories.filter(c => !c.isNew).reduce((accumulator, currentItem) => {
@@ -178,6 +207,124 @@ export class BudgetBuilderComponent {
       return cats;
     });
   }
+
+  async onCellKeyDown(event: KeyboardEvent, category: BudgetCategory, parentId: string) {
+    let newRow = this.currentRow;
+    let newCol = this.currentCol;
+
+    switch(event.key) {
+      case 'Enter':
+        this.addNewCategory(category, parentId);
+
+        const sleep = (ms: number): Promise<void> => {
+          return new Promise(resolve => setTimeout(resolve, ms));
+        };
+
+        // Await 200 miniseconds to make sure that the navigationMaxtrix() is updated after categories() is udpated
+        await sleep(200);
+
+        // Need to udpate currentRow and currentCol as handling ArrowDown event when a new category is added
+        if (this.currentRow < this.navigationMaxtrix().length - 1) {
+          newRow++
+        }
+
+        if (this.currentCol > this.navigationMaxtrix()[newRow].length) {
+          newCol = this.navigationMaxtrix()[newRow].length;
+        }
+
+        break;
+      case 'Tab':
+      case 'ArrowRight':
+        event.preventDefault(); // Prevent default scrolling
+
+        if (this.currentCol < this.navigationMaxtrix()[this.currentRow].length - 1) {
+          newCol++;
+          break;
+        } 
+        
+        if (this.currentRow < this.navigationMaxtrix().length - 1) {
+          newRow++;
+          newCol = 0;
+          break;
+        }
+
+        break;
+      case 'ArrowLeft':
+        event.preventDefault(); // Prevent default scrolling
+
+        if (this.currentCol > 0) {
+          newCol--;
+          break;
+        }
+        
+        if (this.currentRow > 0) {
+          newRow = (this.currentRow > 0) ? this.currentRow - 1 : this.navigationMaxtrix().length - 1;
+          newCol = this.navigationMaxtrix()[newRow].length - 1;
+          break;
+        }
+
+        break;
+      case 'ArrowDown':
+        event.preventDefault(); // Prevent default scrolling
+
+        if (this.currentRow < this.navigationMaxtrix().length - 1) {
+          newRow++
+        }
+
+        if (this.currentCol > this.navigationMaxtrix()[newRow].length) {
+          newCol = this.navigationMaxtrix()[newRow].length;
+        }
+        break;
+      case 'ArrowUp':
+        event.preventDefault(); // Prevent default scrolling
+
+        if (this.currentRow > 0) {
+          newRow--;
+        } 
+
+        if (this.currentCol > this.navigationMaxtrix()[newRow].length) {
+          newCol = this.navigationMaxtrix()[newRow].length;
+        }
+        break;
+    }
+
+    // Ensure new position is valid
+    if (newRow >= 0 && newRow < this.navigationMaxtrix().length) {
+      if (newCol >  this.navigationMaxtrix()[newRow].length - 1) {
+        newCol = this.navigationMaxtrix()[newRow].length - 1;
+      }
+
+      if (newCol >= 0) {
+        this.currentRow = newRow;
+        this.currentCol = newCol;
+        this.focusCurrentCell();
+      }
+    } 
+  }
+
+  onDateChange(start: HTMLInputElement, end: HTMLInputElement) {
+    this.startDate.set(new Date(start.value));
+    this.endDate.set(new Date(end.value));
+    this.focusedCell.set(null);
+  }
+
+  // Update currentRow and currentCol when an input is focused
+  onCellFocus() {
+    let focusedIndex = this.getFocusedInputIndex();
+    if (focusedIndex === null) {
+      return;
+    }
+
+    for(let row of this.navigationMaxtrix()) {
+      for(let col of row) {
+        if (col.focusedIndex == focusedIndex) {
+          this.currentRow = col.row;
+          this.currentCol = col.col;
+          return;
+        }
+      }
+    }
+  }
   
   applyToAll() {
     const context = this.contextMenu();
@@ -189,12 +336,13 @@ export class BudgetBuilderComponent {
           for (let subSubCategory of subCategory.subCategories!) {
             if (subSubCategory.id == context?.category?.id!) {
               const value = subSubCategory.cells[context.monthIndex!];
-              subSubCategory.cells = subSubCategory.cells.map(() => value) ;
+              // Won't set value for the first cell (category name)
+              subSubCategory.cells = subSubCategory.cells.map((cell, i) => !i ? cell : value) ;
 
-              subCategory.subTotals = subCategory.subTotals.map((_, i) => 
+              subCategory.subTotals = subCategory.subTotals.map((_, i) =>
                 subCategory.subCategories
                 .filter(c => !c.isNew)
-                .reduce((sum, cat) => sum + (cat.cells[i].value || 0), 0)
+                .reduce((sum, cat) => sum + Number(cat.cells[i].value || 0), 0)
               );
 
               category.subTotals = category.subTotals.map((_, i) => 
@@ -236,7 +384,7 @@ export class BudgetBuilderComponent {
               subCategory.subTotals = subCategory.subTotals.map((_, i) => 
                 subCategory.subCategories
                 .filter(c => !c.isNew)
-                .reduce((sum, cat) => sum + (cat.cells[i].value || 0), 0)
+                .reduce((sum, cat) => sum + Number((cat.cells[i].value || 0)), 0)
               );
 
               category.subTotals = category.subTotals.map((_, i) => 
@@ -254,84 +402,28 @@ export class BudgetBuilderComponent {
       return cats;
     });
   }
-
-  handleCellKey(event: KeyboardEvent, category: BudgetCategory, parentId: string, row: number, cell: number) {
-    const key = event.key;
-    let newRow = row;
-    let newCell = cell;
-
-    switch(event.key) {
-      case 'Enter':
-        this.addNewCategory(category, parentId);
-        break;
-      // case 'Tab':
-      // case 'ArrowRight':
-      //   newCell++; break;
-      //   break;
-      // case 'ArrowLeft':
-      //   newCell--; break;
-      //   break;
-      // case 'ArrowDown':
-      //   newRow++; break;
-      //   break;
-      // case 'ArrowUp':
-      //   newRow--; break;
-      //   break;
-      }
-
-      // event.preventDefault(); // Prevent default scrolling
-
-      // Check if new position is valid
-      // if (this.isValidPosition(newRow, newCell)) {
-        this.focusInput(newRow, newCell);
-      // }
-  }
-
-  // Check if the new row/cell indices are within bounds
-  isValidPosition(row: number, cell: number): boolean {
-    return (
-      row >= 0 &&
-      row < this.months.length &&
-      cell >= 0 &&
-      cell < this.months.length
-    );
-  }
-
-  // Focus the input at the new position
-  focusInput(row: number, cell: number) {
-    const input = this.inputMap.get(`${row},${cell}`);
-    if (input) {
-      input.nativeElement.focus();
-    }
-  }
-
-  // Build a map of input references using data attributes
-  buildInputMap() {
-    this.inputMap.clear();
-    this.inputs.forEach(input => {
-      const row = input.nativeElement.getAttribute('data-row');
-      const cell = input.nativeElement.getAttribute('data-cell');
-      this.inputMap.set(`${row},${cell}`, input);
-    });
-  }
-    
+   
   
-  addNewCategory(category: BudgetCategory, parentId: string) {
-    if (!category.isNew) {
+  private addNewCategory(currentCategory: BudgetCategory, parentId: string) {
+    if (!currentCategory.isNew) {
       return;
     }
 
-    const newCategory = this.createCategory(category.newName, category.type, category.isParent);
+    const addedCategory = this.createCategory(currentCategory.cells[0].value.toString(), currentCategory.type, currentCategory.isParent);
 
     this.categories.update((cats) => {
       for(let category of cats) {
         if (category.id == parentId) {
+          // Add newSubCategory for the category has been add
+          let addNewSubCategory = this.createCategory(`Add new ${addedCategory.name} category`, category.type, false, true);
+          addedCategory.subCategories.push(addNewSubCategory);
+
           let addNewCategory = category.subCategories.pop();
-          let addNewSubCategory = this.createCategory(`Add new ${newCategory.name} category`, category.type, false, true);
-          newCategory.subCategories.push(addNewSubCategory);
-          category.subCategories.push(newCategory);
+          category.subCategories.push(addedCategory);
+          
+          // Update the displayed value of addNewCategory to original name after it's edited by typing
           if (addNewCategory) {
-            addNewCategory.newName = addNewCategory.name;
+            addNewCategory.cells[0].value = currentCategory.name;
             category.subCategories.push(addNewCategory);
           }
           return cats;
@@ -340,9 +432,11 @@ export class BudgetBuilderComponent {
         for(let subCategory of category.subCategories) {
           if (subCategory.id == parentId) {
             let addNewCategory = subCategory.subCategories.pop();
-            subCategory.subCategories.push(newCategory);
+            subCategory.subCategories.push(addedCategory);
+
+             // Update the displayed value of addNewCategory to original name after it's edited by typing
             if (addNewCategory) {
-              addNewCategory.newName = addNewCategory.name;
+              addNewCategory.cells[0].value = currentCategory.name;
               subCategory.subCategories.push(addNewCategory);
             }
             return cats;
@@ -353,14 +447,74 @@ export class BudgetBuilderComponent {
     });
 
     this.focusedCell.set({ 
-      categoryId: newCategory.id, 
+      categoryId: addedCategory.id, 
       monthIndex: 0 
     });
   }
 
-  handleDateChange(start: HTMLInputElement, end: HTMLInputElement) {
-    this.startDate.set(new Date(start.value));
-    this.endDate.set(new Date(end.value));
-    this.focusedCell.set(null);
+  private generateMonths(start: Date, end: Date): Date[] {
+    const months = [];
+    const current = new Date(start);
+    while (current <= end) {
+      months.push(new Date(current));
+      current.setMonth(current.getMonth() + 1);
+    }
+    return months;
+  }
+
+  private createCategory(name: string, type: 'income' | 'expense', isParent: boolean, isNew: boolean = false): BudgetCategory {
+    // category name column
+    const cells: any[] = [{ value: name, isEditable: isNew, allowFocus: isNew }];
+
+    if (!isParent && !isNew) {
+      // monthly columns
+      const moreCells: any[] = Array.from({ length: this.months().length }, () => ({ value: 0, isEditable: true, allowFocus: true }));
+      cells.push(...moreCells);
+    }
+
+    return {
+      id: Math.random().toString(),
+      name,
+      type,
+      isParent,
+      isNew,
+      cells: cells,
+      subCategories: [],
+      subTotals: Array(this.months().length + 1).fill(0)
+    };
+  }
+
+  // Method to check which input is focused
+  private getFocusedInputIndex(): number | null {
+    const activeElement = document.activeElement; // Get the currently focused element
+
+    // Convert QueryList to an array of native elements
+    const cellInputs = this.cellInputs.toArray();
+
+    // Find the index of the focused input
+    for (let i = 0; i < cellInputs.length; i++) {
+      if (cellInputs[i].nativeElement === activeElement) {
+        return i; // Return the index if found
+      }
+    }
+
+    return null; // No input is focused
+  }
+
+  private focusCurrentCell() {
+    // Calculate focused index based on 2D position
+    let focusedIndex = 0;
+    let maxtrix = this.navigationMaxtrix();
+
+    for (let i = 0; i < this.currentRow; i++) {
+      focusedIndex += maxtrix[i].length;
+    }
+
+    focusedIndex += this.currentCol;
+
+    const inputs = this.cellInputs.toArray();
+    if (inputs[focusedIndex]) {
+      inputs[focusedIndex].nativeElement.focus();
+    }
   }
 }
