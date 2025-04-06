@@ -343,9 +343,23 @@ export class BudgetBuilderComponent {
         for(let subCategory of category.subCategories!) {
           for (let subSubCategory of subCategory.subCategories!) {
             if (subSubCategory.id == context?.category?.id!) {
-              const value = subSubCategory.cells[context.monthIndex!];
-              // Won't set value for the first cell (category name)
-              subSubCategory.cells = subSubCategory.cells.map((cell, i) => !i ? cell : value) ;
+              const touchedCell = subSubCategory.cells[context.monthIndex!];
+
+              subSubCategory.cells = subSubCategory.cells.map((cell, i) => {
+                // Won't override for the first cell (category name)
+                if (!i) {
+                  return cell;
+                }
+
+                // Deep clone to avoid reference
+                const touchedCellClone: BudgetCell = {
+                  value: touchedCell.value,
+                  isEditable: touchedCell.isEditable,
+                  allowFocus: touchedCell.allowFocus
+                }
+
+                return touchedCellClone;
+              });
 
               subCategory.subTotals = subCategory.subTotals.map((_, i) =>
                 subCategory.subCategories
