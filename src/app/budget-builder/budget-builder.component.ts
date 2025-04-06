@@ -92,6 +92,13 @@ export class BudgetBuilderComponent {
 
   ngAfterViewInit() {
     this.focusCurrentCell();
+
+    // To prevent an input's value from changing when scrolling over it
+    document.querySelectorAll('input').forEach(input => {
+      input.addEventListener('wheel', (e) => {
+        e.preventDefault();
+      });
+    });
   }
 
   get totals() {
