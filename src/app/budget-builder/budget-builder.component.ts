@@ -482,10 +482,11 @@ export class BudgetBuilderComponent {
   private createCategory(name: string, type: 'income' | 'expense', isParent: boolean, isNew: boolean = false): BudgetCategory {
     // category name column
     const cells: any[] = [{ value: name, isEditable: isNew, allowFocus: isNew }];
+    const MAX_MONTH_LENGTH = 12;
 
     if (!isParent && !isNew) {
       // monthly columns
-      const moreCells: any[] = Array.from({ length: this.months().length }, () => ({ value: 0, isEditable: true, allowFocus: true }));
+      const moreCells: any[] = Array.from({ length: MAX_MONTH_LENGTH }, () => ({ value: 0, isEditable: true, allowFocus: true }));
       cells.push(...moreCells);
     }
 
@@ -497,7 +498,7 @@ export class BudgetBuilderComponent {
       isNew,
       cells: cells,
       subCategories: [],
-      subTotals: Array(this.months().length + 1).fill(0)
+      subTotals: Array(MAX_MONTH_LENGTH + 1).fill(0)
     };
   }
 
