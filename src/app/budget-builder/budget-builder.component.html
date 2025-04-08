@@ -13,7 +13,7 @@
       <thead>
         <tr>
           <th class="p-2 border bg-gray-200">Categories</th>
-          <th *ngFor="let month of months()" class="p-2 border bg-gray-200">
+          <th *ngFor="let month of months(); trackBy: trackById" class="p-2 border bg-gray-200">
             {{ month | date:'MMM' }}
           </th>
           <th class="p-2 border bg-gray-200">Action</th>
@@ -22,37 +22,37 @@
   
       <tbody>
         <!-- 1. Category begin -->
-        <ng-container *ngFor="let category of categories()">
+        <ng-container *ngFor="let category of categories(); trackBy: trackById">
           <!-- 1.1. Category name begin -->
           <tr
           [class.bg-green-50]="category.type == 'income'"
           [class.bg-red-50]="category.type == 'expense'">
               <td class="border p-2 font-bold" [attr.colspan]="months().length + 2"
-              *ngFor="let cell of category.cells; let categoryColIndex = index">{{ cell.value }}</td>
+              *ngFor="let cell of category.cells; trackBy: trackById">{{ cell.value }}</td>
           </tr>
           <!-- 1.1. Caegory name end -->
 
           <!-- 2. SubCategory begin -->
-          <ng-container *ngFor="let subCategory of category.subCategories">
+          <ng-container *ngFor="let subCategory of category.subCategories; trackBy: trackById">
             <!-- 2.1. SubCategory name begin -->
             <tr class="sub-row"
             [class.bg-green-50]="subCategory.type == 'income'"
             [class.bg-red-50]="subCategory.type == 'expense'"
             *ngIf="!subCategory.isNew">
               <td class="border p-2 font-bold" [attr.colspan]="months().length + 2"
-              *ngFor="let cell of subCategory.cells">{{ cell.value }}</td>
+              *ngFor="let cell of subCategory.cells; trackBy: trackById">{{ cell.value }}</td>
             </tr>
             <!-- 2.1. SubCategory name end -->
 
 
             <!-- 3. SubSubCategory begin -->
-            <ng-container *ngFor="let subSubCategory of subCategory.subCategories">
+            <ng-container *ngFor="let subSubCategory of subCategory.subCategories; trackBy: trackById">
               <!-- 3.1. SubSubCategory begin -->
               <tr class="sub-sub-row"
               [class.bg-green-50]="category.type == 'income'"
               [class.bg-red-50]="category.type == 'expense'"
               *ngIf="!subSubCategory.isNew">
-                <ng-container *ngFor="let cell of subSubCategory.cells; let subSubCategoryColIndex = index">
+                <ng-container *ngFor="let cell of subSubCategory.cells; let subSubCategoryColIndex = index; trackBy: trackById">
                   <!-- 3.1.1. SubSubCategory name begin -->
                   <td class="border p-2"
                   *ngIf="!cell.allowFocus">{{ cell.value }}</td>
@@ -89,7 +89,7 @@
               [class.bg-red-50]="subSubCategory.type == 'expense'" 
               *ngIf="subSubCategory.isNew">
                 <td class="border p-2" [attr.colspan]="months().length + 1"
-                *ngFor="let cell of subSubCategory.cells">
+                *ngFor="let cell of subSubCategory.cells; trackBy: trackById">
                   <input #cellInput type="text" class="w-full"
                   [class.income]="subSubCategory.type == 'income'"
                   [class.expense]="subSubCategory.type == 'expense'"
@@ -107,7 +107,7 @@
             [class.bg-green-50]="subCategory.type == 'income'"
             [class.bg-red-50]="subCategory.type == 'expense'" 
             *ngIf="!subCategory.isNew">
-              <ng-container *ngFor="let subTotal of subCategory.subTotals; let subTotalColIndex = index;">
+              <ng-container *ngFor="let subTotal of subCategory.subTotals; let subTotalColIndex = index; trackBy: trackById">
                 <td class="border p-2 font-bold"
                 *ngIf="subTotalColIndex == 0">Sub Total</td>
 
@@ -122,7 +122,7 @@
             [class.bg-red-50]="subCategory.type == 'expense'"  
             *ngIf="subCategory.isNew">
               <td class="border p-2 font-bold" [attr.colspan]="months().length + 1"
-                *ngFor="let cell of subCategory.cells">
+                *ngFor="let cell of subCategory.cells; trackBy: trackById">
                   <input #cellInput type="text" class="w-full"
                   [class.income]="subCategory.type == 'income'"
                   [class.expense]="subCategory.type == 'expense'"
@@ -141,7 +141,7 @@
           <tr class="sub-row"
           [class.bg-green-50]="category.type == 'income'"
           [class.bg-red-50]="category.type == 'expense'">
-            <ng-container *ngFor="let subTotal of category.subTotals; let subTotalColIndex = index;">
+            <ng-container *ngFor="let subTotal of category.subTotals; let subTotalColIndex = index; trackBy: trackById">
               <td class="border p-2 font-bold"
               *ngIf="subTotalColIndex == 0">{{category.name}} Total</td>
 
@@ -160,7 +160,7 @@
         <!-- Region Totals -->
         <tr>
           <td class="bg-yellow-200 p-2 border font-bold">Profit / Loss</td>
-          <ng-container *ngFor="let profitLoss of totals().profitLoss; let i = index;">
+          <ng-container *ngFor="let profitLoss of totals().profitLoss; let i = index; trackBy: trackById">
             <td class="p-2 border font-bold text-right"
             [class.bg-yellow-200] = "profitLoss == 0"
             [class.bg-green-200] = "profitLoss > 0"
@@ -173,7 +173,7 @@
 
         <tr>
           <td class="bg-yellow-200 p-2 border font-bold">Opening Balance</td>
-          <ng-container *ngFor="let balance of totals().openingBalance; let i = index;">
+          <ng-container *ngFor="let balance of totals().openingBalance; let i = index; trackBy: trackById">
             <td class="p-2 border font-bold text-right"
             [class.bg-yellow-200] = "balance == 0"
             [class.bg-green-200] = "balance > 0"
@@ -186,7 +186,7 @@
 
         <tr>
           <td class="bg-yellow-200 p-2 border font-bold">Closing Balance</td>
-          <ng-container *ngFor="let balance of totals().closingBalance; let i = index;">
+          <ng-container *ngFor="let balance of totals().closingBalance; let i = index; trackBy: trackById">
             <td class="p-2 border font-bold text-right"
             [class.bg-yellow-200] = "balance == 0"
             [class.bg-green-200] = "balance > 0"

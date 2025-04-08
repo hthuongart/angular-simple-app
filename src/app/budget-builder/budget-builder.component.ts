@@ -6,6 +6,7 @@ import { withInterceptors } from '@angular/common/http';
 import { RouterLinkWithHref } from '@angular/router';
 
 interface BudgetCell {
+  id: string;
   value: number | string;
   isEditable: boolean;
   allowFocus: boolean;
@@ -340,6 +341,14 @@ export class BudgetBuilderComponent {
       }
     }
   }
+
+  // TrackBy function: Returns the unique identifier for each item
+  trackById(index: number, item: any): string {
+    if (item?.id) {
+      return '';
+    }
+    return item.id; // Use a stable unique identifier (e.g., database ID)
+  }
   
   applyToAll() {
     const context = this.contextMenu();
@@ -360,6 +369,7 @@ export class BudgetBuilderComponent {
 
                 // Deep clone to avoid reference
                 const touchedCellClone: BudgetCell = {
+                  id: touchedCell.id,
                   value: touchedCell.value,
                   isEditable: touchedCell.isEditable,
                   allowFocus: touchedCell.allowFocus
@@ -488,12 +498,23 @@ export class BudgetBuilderComponent {
 
   private createCategory(name: string, type: 'income' | 'expense', isParent: boolean, isNew: boolean = false): BudgetCategory {
     // category name column
-    const cells: any[] = [{ value: name, isEditable: isNew, allowFocus: isNew }];
+    const cells: any[] = [{
+      id: Math.random().toString(),
+      value: name, 
+      isEditable: isNew, 
+      allowFocus: isNew 
+    }];
+    
     const MAX_MONTH_LENGTH = 12;
 
     if (!isParent && !isNew) {
       // monthly columns
-      const moreCells: any[] = Array.from({ length: MAX_MONTH_LENGTH }, () => ({ value: 0, isEditable: true, allowFocus: true }));
+      const moreCells: any[] = Array.from({ length: MAX_MONTH_LENGTH }, () => ({ 
+        id: Math.random().toString(),
+        value: 0, 
+        isEditable: true, 
+        allowFocus: true 
+      }));
       cells.push(...moreCells);
     }
 
