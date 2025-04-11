@@ -2,8 +2,8 @@
 import { Component, signal, computed, effect, ViewChildren, QueryList, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { withInterceptors } from '@angular/common/http';
-import { RouterLinkWithHref } from '@angular/router';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 interface BudgetCell {
   id: string;
@@ -46,6 +46,8 @@ export class BudgetBuilderComponent {
   
   currentRow = 0;
   currentCol = 0;
+
+  private cellChangeSubject = new Subject<any>();
   
   constructor (){
     // #region Income
@@ -99,6 +101,34 @@ export class BudgetBuilderComponent {
       input.addEventListener('wheel', (e) => {
         e.preventDefault();
       });
+    });
+
+    this.cellChangeSubject.pipe(
+      debounceTime(300),  // wait 300ms after each keystroke
+      distinctUntilChanged((prev, curr) => prev.value === curr.value)  // only emit if value changed
+    ).subscribe((data: any) => {
+      this.categories.update((cats) => {
+        for(let category of cats) {
+          for(let subCategory of category.subCategories!) {
+            for(let subSubCategory of subCategory.subCategories!) {
+              if (subSubCategory.id == data.categoryId) {
+                subCategory.subTotals[data.monthIndex] = subCategory.subCategories .filter(c => !c.isNew).reduce((accumulator, currentItem) => {
+                  return accumulator + Number(currentItem.cells[data.monthIndex].value);
+                }, 0);
+    
+                category.subTotals[data.monthIndex] = category.subCategories.filter(c => !c.isNew).reduce((accumulator, currentItem) => {
+                  return accumulator + currentItem.subTotals[data.monthIndex];
+                }, 0);
+    
+                break;
+              }
+            }
+          }
+        }
+  
+        return cats;
+      });
+
     });
   }
 
@@ -194,31 +224,15 @@ export class BudgetBuilderComponent {
     });
   }
 
-  onCellChange(categoryInput: BudgetCategory, monthIndex: number) {
+  onCellChange(value: number, categoryInput: BudgetCategory, monthIndex: number) {
     if (categoryInput.isNew) {
       return;
     }
 
-    this.categories.update((cats) => {
-      for(let category of cats) {
-        for(let subCategory of category.subCategories!) {
-          for(let subSubCategory of subCategory.subCategories!) {
-            if (subSubCategory.id == categoryInput?.id) {
-              subCategory.subTotals[monthIndex] = subCategory.subCategories .filter(c => !c.isNew).reduce((accumulator, currentItem) => {
-                return accumulator + Number(currentItem.cells[monthIndex].value);
-              }, 0);
-  
-              category.subTotals[monthIndex] = category.subCategories.filter(c => !c.isNew).reduce((accumulator, currentItem) => {
-                return accumulator + currentItem.subTotals[monthIndex];
-              }, 0);
-  
-              break;
-            }
-          }
-        }
-      }
-
-      return cats;
+    this.cellChangeSubject.next({
+      value: value,
+      categoryId: categoryInput.id,
+      monthIndex: monthIndex,
     });
   }
 

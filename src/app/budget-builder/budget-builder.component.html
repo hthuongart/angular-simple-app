@@ -64,7 +64,7 @@
                     [class.income]="subSubCategory.type == 'income'"
                     [class.expense]="subSubCategory.type == 'expense'"
                     [(ngModel)]="cell.value"
-                    (ngModelChange)="onCellChange(subSubCategory, subSubCategoryColIndex)"
+                    (ngModelChange)="onCellChange($event, subSubCategory, subSubCategoryColIndex)"
                     (contextmenu)="onCellRightClick($event, subSubCategory, subSubCategoryColIndex)"
                     (keydown)="onCellKeyDown($event, subSubCategory, subCategory.id)"
                     (focus)="onCellFocus()"/>
